@@ -159,5 +159,8 @@ private func internalInfoCallback(_ axObserver: AXObserver,
         NSLog("Unknown AX notification %s received", notification as String)
         return
     }
-    observer.callbackWithInfo!(observer, element, notif, info)
+    
+    if let callback = observer.callbackWithInfo {
+        callback(observer, element, notif, info)
+    }
 }
