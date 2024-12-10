@@ -134,27 +134,46 @@ private func internalCallback(_ axObserver: AXObserver,
                               axElement: AXUIElement,
                               notification: CFString,
                               userData: UnsafeMutableRawPointer?) {
-    guard let userData = userData else { fatalError("userData should be an AXSwift.Observer") }
-
-    let observer = Unmanaged<Observer>.fromOpaque(userData).takeUnretainedValue()
+    guard let userData = userData else { return }
+    
+    // Retain the observer for the duration of this function
+    let observer = Unmanaged<Observer>.fromOpaque(userData).retain().takeUnretainedValue()
+    defer {
+        // Release it at the end of the function
+        Unmanaged.passUnretained(observer).release()
+    }
+    
     let element = UIElement(axElement)
+    
     guard let notif = AXNotification(rawValue: notification as String) else {
         NSLog("Unknown AX notification %s received", notification as String)
         return
     }
-    observer.callback!(observer, element, notif)
+    
+    if let callback = observer.callback {
+        callback(observer, element, notif)
+    }
 }
 
 private func internalInfoCallback(_ axObserver: AXObserver,
-                                  axElement: AXUIElement,
-                                  notification: CFString,
-                                  cfInfo: CFDictionary,
-                                  userData: UnsafeMutableRawPointer?) {
-    guard let userData = userData else { fatalError("userData should be an AXSwift.Observer") }
-
-    let observer = Unmanaged<Observer>.fromOpaque(userData).takeUnretainedValue()
+                                axElement: AXUIElement,
+                                notification: CFString,
+                                cfInfo: CFDictionary,
+                                userData: UnsafeMutableRawPointer?) {
+    guard let userData = userData else { return }
+    
+    // Retain the observer for the duration of this function
+    let observer = Unmanaged<Observer>.fromOpaque(userData).retain().takeUnretainedValue()
+    defer {
+        // Release it at the end of the function
+        Unmanaged.passUnretained(observer).release()
+    }
+    
     let element = UIElement(axElement)
-    let info = cfInfo as NSDictionary? as! [String: AnyObject]?
+    
+    // Safely cast the dictionary
+    guard let info = cfInfo as? [String: AnyObject] else { return }
+    
     guard let notif = AXNotification(rawValue: notification as String) else {
         NSLog("Unknown AX notification %s received", notification as String)
         return
@@ -164,3 +183,4 @@ private func internalInfoCallback(_ axObserver: AXObserver,
         callback(observer, element, notif, info)
     }
 }
+
