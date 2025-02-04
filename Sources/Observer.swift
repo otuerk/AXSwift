@@ -17,7 +17,7 @@ public final class Observer {
                                          _ info: [String: AnyObject]?) -> Void
 
     let pid: pid_t
-    let axObserver: AXObserver!
+    let axObserver: AXObserver?
     let callback: Callback?
     let callbackWithInfo: CallbackWithInfo?
 
@@ -71,6 +71,8 @@ public final class Observer {
     ///
     /// If the observer has already been started, this method does nothing.
     public func start() {
+        guard let axObserver else { return }
+        
         CFRunLoopAddSource(
             RunLoop.current.getCFRunLoop(),
             AXObserverGetRunLoopSource(axObserver),
@@ -84,6 +86,8 @@ public final class Observer {
     /// - important: Events will still be queued in the target process until the Observer is started
     ///              again or destroyed. If you don't want them, create a new Observer.
     public func stop() {
+        guard let axObserver else { return }
+        
         CFRunLoopRemoveSource(
             RunLoop.current.getCFRunLoop(),
             AXObserverGetRunLoopSource(axObserver),
@@ -102,6 +106,8 @@ public final class Observer {
     ///           that the system-wide element does not support notifications).
     public func addNotification(_ notification: AXNotification,
                                 forElement element: UIElement) throws {
+        guard let axObserver else { return }
+        
         let selfPtr = UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
         let error = AXObserverAddNotification(
             axObserver, element.element, notification.rawValue as CFString, selfPtr
@@ -121,6 +127,8 @@ public final class Observer {
     ///           that the system-wide element does not support notifications).
     public func removeNotification(_ notification: AXNotification,
                                    forElement element: UIElement) throws {
+        guard let axObserver else { return }
+        
         let error = AXObserverRemoveNotification(
             axObserver, element.element, notification.rawValue as CFString
         )
@@ -179,7 +187,7 @@ private func internalInfoCallback(_ axObserver: AXObserver,
         return
     }
     
-    if let callback = observer.callbackWithInfo {
+    if let callback = observer.callbackWithInfo, observer.pid > 0 && observer.axObserver != nil {
         callback(observer, element, notif, info)
     }
 }
