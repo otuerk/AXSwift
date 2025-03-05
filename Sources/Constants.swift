@@ -63,6 +63,12 @@ public enum AXNotification: String {
     // help an assistive application determine the importance of this announcement.  This
     // notification should be posted for the application element.
     case announcementRequested   = "AXAnnouncementRequested"
+    
+    // Dock
+    case exposeShowAllWindows    = "AXExposeShowAllWindows"
+    case exposeShowFrontWindows  = "AXExposeShowFrontWindows"
+    case exposeShowDesktop       = "AXExposeShowDesktop"
+    case exposeExit              = "AXExposeExit"
 }
 
 /// All UIElement roles.
