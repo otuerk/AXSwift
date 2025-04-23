@@ -21,8 +21,8 @@ public final class Observer {
     let callback: Callback?
     let callbackWithInfo: CallbackWithInfo?
 
-    private var isValid = true
-    private let invalidationLock = NSLock()
+    var isValid = true
+    let invalidationLock = NSLock()
     
     public fileprivate(set) lazy var application: Application =
         Application(forKnownProcessID: self.pid)!
@@ -167,9 +167,19 @@ private func internalCallback(_ axObserver: AXObserver,
         return
     }
     
-    if let callback = observer.callback {
-        callback(observer, element, notif)
+    // Check if the observer is still valid
+    observer.invalidationLock.lock()
+    let isValid = observer.isValid
+    observer.invalidationLock.unlock()
+    
+    guard isValid,
+          observer.pid > 0,
+          observer.axObserver != nil,
+          let callback = observer.callback else {
+        return
     }
+    
+    callback(observer, element, notif)
 }
 
 private func internalInfoCallback(_ axObserver: AXObserver,
@@ -196,8 +206,18 @@ private func internalInfoCallback(_ axObserver: AXObserver,
         return
     }
     
-    if let callback = observer.callbackWithInfo, observer.pid > 0 && observer.axObserver != nil {
-        callback(observer, element, notif, info)
+    // Check if the observer is still valid
+    observer.invalidationLock.lock()
+    let isValid = observer.isValid
+    observer.invalidationLock.unlock()
+    
+    guard isValid,
+          observer.pid > 0,
+          observer.axObserver != nil,
+          let callback = observer.callbackWithInfo else {
+        return
     }
+    
+    callback(observer, element, notif, info)
 }
 
