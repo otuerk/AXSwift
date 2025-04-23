@@ -21,6 +21,9 @@ public final class Observer {
     let callback: Callback?
     let callbackWithInfo: CallbackWithInfo?
 
+    private var isValid = true
+    private let invalidationLock = NSLock()
+    
     public fileprivate(set) lazy var application: Application =
         Application(forKnownProcessID: self.pid)!
 
@@ -65,6 +68,12 @@ public final class Observer {
 
     deinit {
         stop()
+    }
+    
+    func invalidate() {
+        invalidationLock.lock()
+        isValid = false
+        invalidationLock.unlock()
     }
 
     /// Starts watching for events. You don't need to call this method unless you use `stop()`.
