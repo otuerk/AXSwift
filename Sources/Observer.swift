@@ -21,8 +21,8 @@ public final class Observer {
     let callback: Callback?
     let callbackWithInfo: CallbackWithInfo?
 
-    var isValid = true
-    let invalidationLock = NSLock()
+    public var isValid = true
+    private let invalidationLock = NSLock()
     
     public fileprivate(set) lazy var application: Application =
         Application(forKnownProcessID: self.pid)!
