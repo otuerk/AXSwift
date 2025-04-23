@@ -70,7 +70,7 @@ public final class Observer {
         stop()
     }
     
-    func invalidate() {
+    public func invalidate() {
         invalidationLock.lock()
         isValid = false
         invalidationLock.unlock()
