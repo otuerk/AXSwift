@@ -18,10 +18,41 @@ public final class Observer {
 
     let pid: pid_t
     let axObserver: AXObserver?
-    let callback: Callback?
-    let callbackWithInfo: CallbackWithInfo?
+    // Use atomic properties for thread safety
+    private let _callback: Callback?
+    private let _callbackWithInfo: CallbackWithInfo?
+    
+    // Thread-safe property access
+    var callback: Callback? {
+        get {
+            invalidationLock.lock()
+            defer { invalidationLock.unlock() }
+            return _callback
+        }
+    }
+    
+    var callbackWithInfo: CallbackWithInfo? {
+        get {
+            invalidationLock.lock()
+            defer { invalidationLock.unlock() }
+            return _callbackWithInfo
+        }
+    }
 
-    public var isValid = true
+    // Use atomic property with a lock for thread safety
+    private var _isValid = true
+    public var isValid: Bool {
+        get {
+            invalidationLock.lock()
+            defer { invalidationLock.unlock() }
+            return _isValid
+        }
+        set {
+            invalidationLock.lock()
+            _isValid = newValue
+            invalidationLock.unlock()
+        }
+    }
     public let invalidationLock = NSLock()
     
     public fileprivate(set) lazy var application: Application =
@@ -34,8 +65,8 @@ public final class Observer {
 
         pid = processID
         self.axObserver = axObserver
-        self.callback = callback
-        callbackWithInfo = nil
+        self._callback = callback
+        self._callbackWithInfo = nil
 
         guard error == .success else {
             throw error
@@ -55,8 +86,8 @@ public final class Observer {
 
         pid = processID
         self.axObserver = axObserver
-        self.callback = nil
-        callbackWithInfo = callback
+        self._callback = nil
+        self._callbackWithInfo = callback
 
         guard error == .success else {
             throw error
@@ -71,9 +102,7 @@ public final class Observer {
     }
     
     public func invalidate() {
-        invalidationLock.lock()
         isValid = false
-        invalidationLock.unlock()
     }
 
     /// Starts watching for events. You don't need to call this method unless you use `stop()`.
@@ -153,13 +182,22 @@ private func internalCallback(_ axObserver: AXObserver,
                               userData: UnsafeMutableRawPointer?) {
     guard let userData = userData else { return }
     
-    // Retain the observer for the duration of this function
-    let observer = Unmanaged<Observer>.fromOpaque(userData).retain().takeUnretainedValue()
-    defer {
-        // Release it at the end of the function
-        Unmanaged.passUnretained(observer).release()
+    // Safely get the observer without crashing if it's been deallocated
+    guard let observer = Unmanaged<Observer>.fromOpaque(userData).takeUnretainedValue() as Observer? else {
+        return
     }
     
+    // Check if the observer is still valid before proceeding
+    guard observer.isValid else { return }
+    
+    // Create a local copy of everything we need to avoid accessing the observer after validation
+    let localPid = observer.pid
+    let localCallback = observer.callback
+    
+    // Bail early if critical properties are missing
+    guard localPid > 0, localCallback != nil else { return }
+    
+    // Now safely create our UIElement and process info
     let element = UIElement(axElement)
     
     guard let notif = AXNotification(rawValue: notification as String) else {
@@ -167,18 +205,10 @@ private func internalCallback(_ axObserver: AXObserver,
         return
     }
     
-    // Check if the observer is still valid
-    observer.invalidationLock.lock()
-    let isValid = observer.isValid
-    observer.invalidationLock.unlock()
+    // Final safety check before callback
+    guard let callback = localCallback else { return }
     
-    guard isValid,
-          observer.pid > 0,
-          observer.axObserver != nil,
-          let callback = observer.callback else {
-        return
-    }
-    
+    // Execute the callback with our safely obtained values
     callback(observer, element, notif)
 }
 
@@ -189,13 +219,22 @@ private func internalInfoCallback(_ axObserver: AXObserver,
                                 userData: UnsafeMutableRawPointer?) {
     guard let userData = userData else { return }
     
-    // Retain the observer for the duration of this function
-    let observer = Unmanaged<Observer>.fromOpaque(userData).retain().takeUnretainedValue()
-    defer {
-        // Release it at the end of the function
-        Unmanaged.passUnretained(observer).release()
+    // Safely get the observer without crashing if it's been deallocated
+    guard let observer = Unmanaged<Observer>.fromOpaque(userData).takeUnretainedValue() as Observer? else {
+        return
     }
     
+    // Check if the observer is still valid before proceeding
+    guard observer.isValid else { return }
+    
+    // Create a local copy of everything we need to avoid accessing the observer after validation
+    let localPid = observer.pid
+    let localCallback = observer.callbackWithInfo
+    
+    // Bail early if critical properties are missing
+    guard localPid > 0, localCallback != nil else { return }
+    
+    // Now safely create our UIElement and process info
     let element = UIElement(axElement)
     
     // Safely cast the dictionary
@@ -206,18 +245,10 @@ private func internalInfoCallback(_ axObserver: AXObserver,
         return
     }
     
-    // Check if the observer is still valid
-    observer.invalidationLock.lock()
-    let isValid = observer.isValid
-    observer.invalidationLock.unlock()
+    // Final safety check before callback
+    guard let callback = localCallback else { return }
     
-    guard isValid,
-          observer.pid > 0,
-          observer.axObserver != nil,
-          let callback = observer.callbackWithInfo else {
-        return
-    }
-    
+    // Execute the callback with our safely obtained values
     callback(observer, element, notif, info)
 }
 
