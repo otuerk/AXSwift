@@ -22,6 +22,15 @@ public final class Observer {
     private let _callback: Callback?
     private let _callbackWithInfo: CallbackWithInfo?
     
+    // Track registered notifications for cleanup
+    private var registeredNotifications: Set<NotificationKey> = []
+    private let notificationLock = NSLock()
+    
+    private struct NotificationKey: Hashable {
+        let element: AXUIElement
+        let notification: String
+    }
+    
     // Thread-safe property access
     var callback: Callback? {
         get {
@@ -98,7 +107,31 @@ public final class Observer {
     }
 
     deinit {
+        // First invalidate to prevent new callbacks
+        invalidate()
+        
+        // Remove all registered notifications before deallocation
+        cleanupNotifications()
+        
+        // Stop the observer
         stop()
+    }
+    
+    private func cleanupNotifications() {
+        guard let axObserver else { return }
+        
+        notificationLock.lock()
+        defer { notificationLock.unlock() }
+        
+        // Remove notifications
+        for notificationKey in registeredNotifications {
+            AXObserverRemoveNotification(
+                axObserver,
+                notificationKey.element,
+                notificationKey.notification as CFString
+            )
+        }
+        registeredNotifications.removeAll()
     }
     
     public func invalidate() {
@@ -153,6 +186,12 @@ public final class Observer {
         guard error == .success || error == .notificationAlreadyRegistered else {
             throw error
         }
+        
+        // Track the notification for cleanup
+        notificationLock.lock()
+        defer { notificationLock.unlock() }
+        let key = NotificationKey(element: element.element, notification: notification.rawValue)
+        registeredNotifications.insert(key)
     }
 
     /// Removes a notification from the observer.
@@ -173,6 +212,12 @@ public final class Observer {
         guard error == .success || error == .notificationNotRegistered else {
             throw error
         }
+        
+        // Remove from tracking
+        notificationLock.lock()
+        defer { notificationLock.unlock() }
+        let key = NotificationKey(element: element.element, notification: notification.rawValue)
+        registeredNotifications.remove(key)
     }
 }
 
@@ -183,9 +228,7 @@ private func internalCallback(_ axObserver: AXObserver,
     guard let userData = userData else { return }
     
     // Safely get the observer without crashing if it's been deallocated
-    guard let observer = Unmanaged<Observer>.fromOpaque(userData).takeUnretainedValue() as Observer? else {
-        return
-    }
+    let observer = Unmanaged<Observer>.fromOpaque(userData).takeUnretainedValue()
     
     // Check if the observer is still valid before proceeding
     guard observer.isValid else { return }
@@ -220,9 +263,7 @@ private func internalInfoCallback(_ axObserver: AXObserver,
     guard let userData = userData else { return }
     
     // Safely get the observer without crashing if it's been deallocated
-    guard let observer = Unmanaged<Observer>.fromOpaque(userData).takeUnretainedValue() as Observer? else {
-        return
-    }
+    let observer = Unmanaged<Observer>.fromOpaque(userData).takeUnretainedValue()
     
     // Check if the observer is still valid before proceeding
     guard observer.isValid else { return }
