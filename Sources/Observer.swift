@@ -230,11 +230,18 @@ private func internalCallback(_ axObserver: AXObserver,
     // Safely get the observer without crashing if it's been deallocated
     let observer = Unmanaged<Observer>.fromOpaque(userData).takeUnretainedValue()
     
+    // Get the pid, this seems to be safe even before checking for validity of the observer
+    let localPid = observer.pid
+    
+    // Make sure the process is still running
+    guard kill(localPid, 0) == 0 else {
+        return
+    }
+    
     // Check if the observer is still valid before proceeding
     guard observer.isValid else { return }
     
     // Create a local copy of everything we need to avoid accessing the observer after validation
-    let localPid = observer.pid
     let localCallback = observer.callback
     
     // Bail early if critical properties are missing
