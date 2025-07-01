@@ -18,7 +18,6 @@
 		2FF560E61FF0C039001AF272 /* AXSwift.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FF560DD1FF0C039001AF272 /* AXSwift.swift */; };
 		2FF560E71FF0C039001AF272 /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FF560DE1FF0C039001AF272 /* Constants.swift */; };
 		2FF560E81FF0C039001AF272 /* Error.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FF560DF1FF0C039001AF272 /* Error.swift */; };
-		2FF560EA1FF0C039001AF272 /* Observer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FF560E11FF0C039001AF272 /* Observer.swift */; };
 		2FF560EB1FF0C039001AF272 /* SystemWideElement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FF560E21FF0C039001AF272 /* SystemWideElement.swift */; };
 		2FF560EC1FF0C039001AF272 /* UIElement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FF560E31FF0C039001AF272 /* UIElement.swift */; };
 /* End PBXBuildFile section */
@@ -58,7 +57,6 @@
 		2FF560DE1FF0C039001AF272 /* Constants.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Constants.swift; sourceTree = "<group>"; };
 		2FF560DF1FF0C039001AF272 /* Error.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Error.swift; sourceTree = "<group>"; };
 		2FF560E01FF0C039001AF272 /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		2FF560E11FF0C039001AF272 /* Observer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Observer.swift; sourceTree = "<group>"; };
 		2FF560E21FF0C039001AF272 /* SystemWideElement.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SystemWideElement.swift; sourceTree = "<group>"; };
 		2FF560E31FF0C039001AF272 /* UIElement.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = UIElement.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -134,7 +132,6 @@
 				2FF560DE1FF0C039001AF272 /* Constants.swift */,
 				2FF560DF1FF0C039001AF272 /* Error.swift */,
 				2FF560E01FF0C039001AF272 /* Info.plist */,
-				2FF560E11FF0C039001AF272 /* Observer.swift */,
 				2FF560E21FF0C039001AF272 /* SystemWideElement.swift */,
 				2FF560E31FF0C039001AF272 /* UIElement.swift */,
 			);
@@ -288,7 +285,6 @@
 				2FF560EB1FF0C039001AF272 /* SystemWideElement.swift in Sources */,
 				2FF560EC1FF0C039001AF272 /* UIElement.swift in Sources */,
 				2FF560E81FF0C039001AF272 /* Error.swift in Sources */,
-				2FF560EA1FF0C039001AF272 /* Observer.swift in Sources */,
 				2FF560E61FF0C039001AF272 /* AXSwift.swift in Sources */,
 				2FF560E41FF0C039001AF272 /* Application.swift in Sources */,
 				2FF560E71FF0C039001AF272 /* Constants.swift in Sources */,

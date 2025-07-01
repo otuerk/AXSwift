@@ -50,28 +50,6 @@ public final class Application: UIElement {
             .compactMap({ Application($0) })
     }
 
-    /// Creates an `Observer` on this application, if it is still alive.
-    public func createObserver(_ callback: @escaping Observer.Callback) -> Observer? {
-        do {
-            return try Observer(processID: try pid(), callback: callback)
-        } catch AXError.invalidUIElement {
-            return nil
-        } catch let error {
-            fatalError("Caught unexpected error creating observer: \(error)")
-        }
-    }
-
-    /// Creates an `Observer` on this application, if it is still alive.
-    public func createObserver(_ callback: @escaping Observer.CallbackWithInfo) -> Observer? {
-        do {
-            return try Observer(processID: try pid(), callback: callback)
-        } catch AXError.invalidUIElement {
-            return nil
-        } catch let error {
-            fatalError("Caught unexpected error creating observer: \(error)")
-        }
-    }
-
     /// Returns a list of the application's visible windows.
     /// - returns: An array of `UIElement`s, one for every visible window. Or `nil` if the list
     ///            cannot be retrieved.
