@@ -7,9 +7,9 @@ import Foundation
 ///
 /// - seeAlso: [OS X Accessibility Model](https://developer.apple.com/library/mac/documentation/Accessibility/Conceptual/AccessibilityMacOSX/OSXAXmodel.html)
 ///
-/// Note that every operation involves IPC and is tied to the event loop of the target process. This
-/// means that operations are synchronous and can hang until they time out. The default timeout is
-/// 6 seconds, but it can be changed using `setMessagingTimeout` and `setGlobalMessagingTimeout`.
+/// Note that every operation involves IPC and is tied to the event loop of the target process.
+/// All operations are now asynchronous and executed on a dedicated background queue to prevent
+/// blocking the main thread. Timeouts can be changed using `setMessagingTimeout` and `setGlobalMessagingTimeout`.
 ///
 /// Every attribute- or action-related function has an enum version and a String version. This is
 /// because certain processes might report attributes or actions not documented in the standard API.
@@ -52,16 +52,26 @@ open class UIElement {
         element = nativeElement
     }
 
-    /// Checks if the current process is a trusted accessibility client. If false, all APIs will
-    /// throw errors.
+    /// Checks if the current process is a trusted accessibility client asynchronously.
     ///
     /// - parameter withPrompt: Whether to show the user a prompt if the process is untrusted. This
     ///                         happens asynchronously and does not affect the return value.
-    open class func isProcessTrusted(withPrompt showPrompt: Bool = false) -> Bool {
-        let options = [
-            kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: showPrompt as CFBoolean
-        ]
-        return AXIsProcessTrustedWithOptions(options as CFDictionary)
+    /// - parameter completion: Called with the result on the main queue
+    open class func isProcessTrusted(withPrompt showPrompt: Bool = false, 
+                                   completion: @escaping (Bool) -> Void) {
+        AXQueue.shared.execute({
+            let options = [
+                kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: showPrompt as CFBoolean
+            ]
+            return AXIsProcessTrustedWithOptions(options as CFDictionary)
+        }, completion: { result in
+            switch result {
+            case .success(let trusted):
+                completion(trusted)
+            case .failure(_):
+                completion(false)
+            }
+        })
     }
 
     /// Timeout in seconds for all UIElement messages. Use this to control how long a method call
@@ -73,136 +83,158 @@ open class UIElement {
 
     // MARK: - Attributes
 
-    /// Returns the list of all attributes.
+    /// Returns the list of all attributes asynchronously.
     ///
     /// Does not include parameterized attributes.
-    open func attributes() throws -> [Attribute] {
-        let attrs = try attributesAsStrings()
-        for attr in attrs where Attribute(rawValue: attr) == nil {
-            print("Unrecognized attribute: \(attr)")
+    /// - parameter completion: Called with the result on the main queue
+    open func attributes(completion: @escaping (Result<[Attribute], Error>) -> Void) {
+        attributesAsStrings { result in
+            switch result {
+            case .success(let attrs):
+                for attr in attrs where Attribute(rawValue: attr) == nil {
+                    print("Unrecognized attribute: \(attr)")
+                }
+                let attributes = attrs.compactMap({ Attribute(rawValue: $0) })
+                completion(.success(attributes))
+            case .failure(let error):
+                completion(.failure(error))
+            }
         }
-        return attrs.compactMap({ Attribute(rawValue: $0) })
     }
 
-    // This version is named differently so the caller doesn't have to specify the return type when
-    // using the enum version.
-    open func attributesAsStrings() throws -> [String] {
-        var names: CFArray?
-        let error = AXUIElementCopyAttributeNames(element, &names)
+    /// Returns attribute names as strings asynchronously.
+    /// - parameter completion: Called with the result on the main queue
+    open func attributesAsStrings(completion: @escaping (Result<[String], Error>) -> Void) {
+        AXQueue.shared.execute({
+            var names: CFArray?
+            let error = AXUIElementCopyAttributeNames(self.element, &names)
 
-        if error == .noValue || error == .attributeUnsupported {
-            return []
-        }
+            if error == .noValue || error == .attributeUnsupported {
+                return []
+            }
 
-        guard error == .success else {
-            throw error
-        }
+            guard error == .success else {
+                throw error
+            }
 
-        // We must first convert the CFArray to a native array, then downcast to an array of
-        // strings.
-        return names! as [AnyObject] as! [String]
+            // We must first convert the CFArray to a native array, then downcast to an array of
+            // strings.
+            return names! as [AnyObject] as! [String]
+        }, completion: completion)
     }
 
-    /// Returns whether `attribute` is supported by this element.
+    /// Returns whether `attribute` is supported by this element asynchronously.
     ///
     /// The `attribute` method returns nil for unsupported attributes and empty attributes alike,
     /// which is more convenient than dealing with exceptions (which are used for more serious
     /// errors). However, if you'd like to specifically test an attribute is actually supported, you
     /// can use this method.
-    open func attributeIsSupported(_ attribute: Attribute) throws -> Bool {
-        return try attributeIsSupported(attribute.rawValue)
+    /// - parameter completion: Called with the result on the main queue
+    open func attributeIsSupported(_ attribute: Attribute, completion: @escaping (Result<Bool, Error>) -> Void) {
+        attributeIsSupported(attribute.rawValue, completion: completion)
     }
 
-    open func attributeIsSupported(_ attribute: String) throws -> Bool {
-        // Ask to copy 0 values, since we are only interested in the return code.
-        var value: CFArray?
-        let error = AXUIElementCopyAttributeValues(element, attribute as CFString, 0, 0, &value)
+    open func attributeIsSupported(_ attribute: String, completion: @escaping (Result<Bool, Error>) -> Void) {
+        AXQueue.shared.execute({
+            // Ask to copy 0 values, since we are only interested in the return code.
+            var value: CFArray?
+            let error = AXUIElementCopyAttributeValues(self.element, attribute as CFString, 0, 0, &value)
 
-        if error == .attributeUnsupported {
-            return false
-        }
+            if error == .attributeUnsupported {
+                return false
+            }
 
-        if error == .noValue {
+            if error == .noValue {
+                return true
+            }
+
+            guard error == .success else {
+                throw error
+            }
+
             return true
-        }
-
-        guard error == .success else {
-            throw error
-        }
-
-        return true
+        }, completion: completion)
     }
 
-    /// Returns whether `attribute` is writeable.
-    open func attributeIsSettable(_ attribute: Attribute) throws -> Bool {
-        return try attributeIsSettable(attribute.rawValue)
+    /// Returns whether `attribute` is writeable asynchronously.
+    /// - parameter completion: Called with the result on the main queue
+    open func attributeIsSettable(_ attribute: Attribute, completion: @escaping (Result<Bool, Error>) -> Void) {
+        attributeIsSettable(attribute.rawValue, completion: completion)
     }
 
-    open func attributeIsSettable(_ attribute: String) throws -> Bool {
-        var settable: DarwinBoolean = false
-        let error = AXUIElementIsAttributeSettable(element, attribute as CFString, &settable)
+    open func attributeIsSettable(_ attribute: String, completion: @escaping (Result<Bool, Error>) -> Void) {
+        AXQueue.shared.execute({
+            var settable: DarwinBoolean = false
+            let error = AXUIElementIsAttributeSettable(self.element, attribute as CFString, &settable)
 
-        if error == .noValue || error == .attributeUnsupported {
-            return false
-        }
+            if error == .noValue || error == .attributeUnsupported {
+                return false
+            }
 
-        guard error == .success else {
-            throw error
-        }
+            guard error == .success else {
+                throw error
+            }
 
-        return settable.boolValue
+            return settable.boolValue
+        }, completion: completion)
     }
 
-    /// Returns the value of `attribute`, if it exists.
+    /// Returns the value of `attribute` asynchronously, if it exists.
     ///
     /// - parameter attribute: The name of a (non-parameterized) attribute.
+    /// - parameter completion: Called with the result on the main queue. Returns an optional 
+    ///                        containing the value of `attribute` as the desired type, or nil.
+    ///                        If `attribute` is an array, all values are returned.
     ///
-    /// - returns: An optional containing the value of `attribute` as the desired type, or nil.
-    ///            If `attribute` is an array, all values are returned.
-    ///
-    /// - warning: This method force-casts the attribute to the desired type, which will abort if
-    ///            the cast fails. If you want to check the return type, ask for Any.
-    open func attribute<T>(_ attribute: Attribute) throws -> T? {
-        return try self.attribute(attribute.rawValue)
+    /// - warning: This method force-casts the attribute to the desired type, which will complete
+    ///            with an error if the cast fails. If you want to check the return type, ask for Any.
+    open func attribute<T>(_ attribute: Attribute, completion: @escaping (Result<T?, Error>) -> Void) {
+        self.attribute(attribute.rawValue, completion: completion)
     }
 
-    open func attribute<T>(_ attribute: String) throws -> T? {
-        var value: AnyObject?
-        let error = AXUIElementCopyAttributeValue(element, attribute as CFString, &value)
+    open func attribute<T>(_ attribute: String, completion: @escaping (Result<T?, Error>) -> Void) {
+        AXQueue.shared.execute({
+            var value: AnyObject?
+            let error = AXUIElementCopyAttributeValue(self.element, attribute as CFString, &value)
 
-        if error == .noValue || error == .attributeUnsupported {
-            return nil
-        }
+            if error == .noValue || error == .attributeUnsupported {
+                return nil
+            }
 
-        guard error == .success else {
-            throw error
-        }
+            guard error == .success else {
+                throw error
+            }
 
-        guard let unpackedValue = (unpackAXValue(value!) as? T) else {
-            throw AXError.illegalArgument
-        }
-        
-        return unpackedValue
+            guard let unpackedValue = (self.unpackAXValue(value!) as? T) else {
+                throw AXError.illegalArgument
+            }
+            
+            return unpackedValue
+        }, completion: completion)
     }
 
-    /// Sets the value of `attribute` to `value`.
+    /// Sets the value of `attribute` to `value` asynchronously.
     ///
-    /// - warning: Unlike read-only methods, this method throws if the attribute doesn't exist.
+    /// - parameter completion: Called with the result on the main queue
+    /// - note: Unlike read-only methods, this method will complete with an error if the attribute doesn't exist.
     ///
-    /// - throws:
+    /// - Possible errors:
     ///   - `Error.AttributeUnsupported`: `attribute` isn't supported.
     ///   - `Error.IllegalArgument`: `value` is an illegal value.
     ///   - `Error.Failure`: A temporary failure occurred.
-    open func setAttribute(_ attribute: Attribute, value: Any) throws {
-        try setAttribute(attribute.rawValue, value: value)
+    open func setAttribute(_ attribute: Attribute, value: Any, completion: @escaping (Result<Void, Error>) -> Void) {
+        setAttribute(attribute.rawValue, value: value, completion: completion)
     }
 
-    open func setAttribute(_ attribute: String, value: Any) throws {
-        let error = AXUIElementSetAttributeValue(element, attribute as CFString, packAXValue(value))
+    open func setAttribute(_ attribute: String, value: Any, completion: @escaping (Result<Void, Error>) -> Void) {
+        AXQueue.shared.execute({
+            let error = AXUIElementSetAttributeValue(self.element, attribute as CFString, self.packAXValue(value))
 
-        guard error == .success else {
-            throw error
-        }
+            guard error == .success else {
+                throw error
+            }
+            return ()
+        }, completion: completion)
     }
 
     /// Gets multiple attributes of the element at once.
@@ -286,24 +318,34 @@ open class UIElement {
 
     // MARK: Array attributes
 
-    /// Returns all the values of the attribute as an array of the given type.
+    /// Returns all the values of the attribute as an array of the given type asynchronously.
     ///
     /// - parameter attribute: The name of the array attribute.
-    ///
-    /// - throws: `Error.IllegalArgument` if the attribute isn't an array.
-    open func arrayAttribute<T>(_ attribute: Attribute) throws -> [T]? {
-        return try arrayAttribute(attribute.rawValue)
+    /// - parameter completion: Called with the result on the main queue
+    /// - note: Possible error: `Error.IllegalArgument` if the attribute isn't an array.
+    open func arrayAttribute<T>(_ attribute: Attribute, completion: @escaping (Result<[T]?, Error>) -> Void) {
+        arrayAttribute(attribute.rawValue, completion: completion)
     }
 
-    open func arrayAttribute<T>(_ attribute: String) throws -> [T]? {
-        guard let value: Any = try self.attribute(attribute) else {
-            return nil
+    open func arrayAttribute<T>(_ attribute: String, completion: @escaping (Result<[T]?, Error>) -> Void) {
+        self.attribute(attribute) { (result: Result<Any?, Error>) in
+            switch result {
+            case .success(let value):
+                guard let value = value else {
+                    completion(.success(nil))
+                    return
+                }
+                guard let array = value as? [AnyObject] else {
+                    // For consistency with the other array attribute APIs, return error if it's not an array.
+                    completion(.failure(AXError.illegalArgument))
+                    return
+                }
+                let mappedArray = array.map({ self.unpackAXValue($0) as! T })
+                completion(.success(mappedArray))
+            case .failure(let error):
+                completion(.failure(error))
+            }
         }
-        guard let array = value as? [AnyObject] else {
-            // For consistency with the other array attribute APIs, throw if it's not an array.
-            throw AXError.illegalArgument
-        }
-        return array.map({ unpackAXValue($0) as! T })
     }
 
     /// Returns a subset of values from an array attribute.
@@ -525,36 +567,44 @@ open class UIElement {
 
     /// Performs the action `action` on the element, returning on success.
     ///
+    /// Performs the action `action` on the element asynchronously.
+    ///
+    /// - parameter completion: Called with the result on the main queue
     /// - note: If the action times out, it might mean that the application is taking a long time to
     ///         actually perform the action. It doesn't necessarily mean that the action wasn't
     ///         performed.
-    /// - throws: `Error.ActionUnsupported` if the action is not supported.
-    open func performAction(_ action: Action) throws {
-        try performAction(action.rawValue)
+    /// - note: Possible error: `Error.ActionUnsupported` if the action is not supported.
+    open func performAction(_ action: Action, completion: @escaping (Result<Void, Error>) -> Void) {
+        performAction(action.rawValue, completion: completion)
     }
 
-    open func performAction(_ action: String) throws {
-        let error = AXUIElementPerformAction(element, action as CFString)
+    open func performAction(_ action: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        AXQueue.shared.execute({
+            let error = AXUIElementPerformAction(self.element, action as CFString)
 
-        guard error == .success else {
-            throw error
-        }
+            guard error == .success else {
+                throw error
+            }
+            return ()
+        }, completion: completion)
     }
 
     // MARK: -
 
-    /// Returns the process ID of the application that the element is a part of.
+    /// Returns the process ID of the application that the element is a part of asynchronously.
     ///
-    /// Throws only if the element is invalid (`Errors.InvalidUIElement`).
-    open func pid() throws -> pid_t {
-        var pid: pid_t = -1
-        let error = AXUIElementGetPid(element, &pid)
+    /// - parameter completion: Called with the result on the main queue. Errors only occur if the element is invalid.
+    open func pid(completion: @escaping (Result<pid_t, Error>) -> Void) {
+        AXQueue.shared.execute({
+            var pid: pid_t = -1
+            let error = AXUIElementGetPid(self.element, &pid)
 
-        guard error == .success else {
-            throw error
-        }
+            guard error == .success else {
+                throw error
+            }
 
-        return pid
+            return pid
+        }, completion: completion)
     }
 
     /// The timeout in seconds for all messages sent to this element. Use this to control how long a
@@ -576,21 +626,23 @@ open class UIElement {
         }
     }
 
-    // Gets the element at the specified coordinates.
+    // Gets the element at the specified coordinates asynchronously.
     // This can only be called on applications and the system-wide element, so it is internal here.
-    func elementAtPosition(_ x: Float, _ y: Float) throws -> UIElement? {
-        var result: AXUIElement?
-        let error = AXUIElementCopyElementAtPosition(element, x, y, &result)
+    func elementAtPosition(_ x: Float, _ y: Float, completion: @escaping (Result<UIElement?, Error>) -> Void) {
+        AXQueue.shared.execute({
+            var result: AXUIElement?
+            let error = AXUIElementCopyElementAtPosition(self.element, x, y, &result)
 
-        if error == .noValue {
-            return nil
-        }
+            if error == .noValue {
+                return nil
+            }
 
-        guard error == .success else {
-            throw error
-        }
+            guard error == .success else {
+                throw error
+            }
 
-        return UIElement(result!)
+            return UIElement(result!)
+        }, completion: completion)
     }
 
     // TODO: convenience functions for attributes
@@ -602,43 +654,15 @@ open class UIElement {
 
 extension UIElement: CustomStringConvertible {
     public var description: String {
-        var roleString: String
-        var description: String?
-        let pid = try? self.pid()
-        do {
-            let role = try self.role()
-            roleString = role?.rawValue ?? "UIElementNoRole"
-
-            switch role {
-            case .some(.application):
-                description = pid
-                    .flatMap { NSRunningApplication(processIdentifier: $0) }
-                    .flatMap { $0.bundleIdentifier } ?? ""
-            case .some(.window):
-                description = (try? attribute(.title) ?? "") ?? ""
-            default:
-                break
-            }
-        } catch AXError.invalidUIElement {
-            roleString = "InvalidUIElement"
-        } catch {
-            roleString = "UnknownUIElement"
-        }
-
-        let pidString = (pid == nil) ? "??" : String(pid!)
-        return "<\(roleString) \""
-             + "\(description ?? String(describing: element))"
-             + "\" (pid=\(pidString))>"
+        // Since description must be synchronous, provide a basic description
+        // Users can call async methods directly for detailed info
+        return "<UIElement \(String(describing: element))>"
     }
 
     public var inspect: String {
-        guard let attributeNames = try? attributes() else {
-            return "InvalidUIElement"
-        }
-        guard let attributes = try? getMultipleAttributes(attributeNames) else {
-            return "InvalidUIElement"
-        }
-        return "\(attributes)"
+        // Since inspect must be synchronous, provide a basic description
+        // Users should call async methods directly for detailed inspection
+        return "<UIElement \(String(describing: element)) - use async methods for detailed inspection>"
     }
 }
 
@@ -652,27 +676,43 @@ public func ==(lhs: UIElement, rhs: UIElement) -> Bool {
 // MARK: - Convenience getters
 
 extension UIElement {
-    /// Returns the role (type) of the element, if it reports one.
+    /// Returns the role (type) of the element asynchronously, if it reports one.
     ///
     /// Almost all elements report a role, but this could return nil for elements that aren't
     /// finished initializing.
     ///
+    /// - parameter completion: Called with the result on the main queue
     /// - seeAlso: [Roles](https://developer.apple.com/library/mac/documentation/AppKit/Reference/NSAccessibility_Protocol_Reference/index.html#//apple_ref/doc/constant_group/Roles)
-    public func role() throws -> Role? {
-        // should this be non-optional?
-        if let str: String = try self.attribute(.role) {
-            return Role(rawValue: str)
-        } else {
-            return nil
+    public func role(completion: @escaping (Result<Role?, Error>) -> Void) {
+        self.attribute(.role) { (result: Result<String?, Error>) in
+            switch result {
+            case .success(let str):
+                if let str = str {
+                    completion(.success(Role(rawValue: str)))
+                } else {
+                    completion(.success(nil))
+                }
+            case .failure(let error):
+                completion(.failure(error))
+            }
         }
     }
 
+    /// Returns the subrole of the element asynchronously.
+    /// - parameter completion: Called with the result on the main queue
     /// - seeAlso: [Subroles](https://developer.apple.com/library/mac/documentation/AppKit/Reference/NSAccessibility_Protocol_Reference/index.html#//apple_ref/doc/constant_group/Subroles)
-    public func subrole() throws -> Subrole? {
-        if let str: String = try self.attribute(.subrole) {
-            return Subrole(rawValue: str)
-        } else {
-            return nil
+    public func subrole(completion: @escaping (Result<Subrole?, Error>) -> Void) {
+        self.attribute(.subrole) { (result: Result<String?, Error>) in
+            switch result {
+            case .success(let str):
+                if let str = str {
+                    completion(.success(Subrole(rawValue: str)))
+                } else {
+                    completion(.success(nil))
+                }
+            case .failure(let error):
+                completion(.failure(error))
+            }
         }
     }
 }

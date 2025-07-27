@@ -20,6 +20,7 @@
 		2FF560E81FF0C039001AF272 /* Error.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FF560DF1FF0C039001AF272 /* Error.swift */; };
 		2FF560EB1FF0C039001AF272 /* SystemWideElement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FF560E21FF0C039001AF272 /* SystemWideElement.swift */; };
 		2FF560EC1FF0C039001AF272 /* UIElement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FF560E31FF0C039001AF272 /* UIElement.swift */; };
+		3B38BD3D2E3657D800E2FEA6 /* AXQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B38BD3C2E3657D800E2FEA6 /* AXQueue.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -59,6 +60,7 @@
 		2FF560E01FF0C039001AF272 /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		2FF560E21FF0C039001AF272 /* SystemWideElement.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SystemWideElement.swift; sourceTree = "<group>"; };
 		2FF560E31FF0C039001AF272 /* UIElement.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = UIElement.swift; sourceTree = "<group>"; };
+		3B38BD3C2E3657D800E2FEA6 /* AXQueue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AXQueue.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -134,6 +136,7 @@
 				2FF560E01FF0C039001AF272 /* Info.plist */,
 				2FF560E21FF0C039001AF272 /* SystemWideElement.swift */,
 				2FF560E31FF0C039001AF272 /* UIElement.swift */,
+				3B38BD3C2E3657D800E2FEA6 /* AXQueue.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -286,6 +289,7 @@
 				2FF560EC1FF0C039001AF272 /* UIElement.swift in Sources */,
 				2FF560E81FF0C039001AF272 /* Error.swift in Sources */,
 				2FF560E61FF0C039001AF272 /* AXSwift.swift in Sources */,
+				3B38BD3D2E3657D800E2FEA6 /* AXQueue.swift in Sources */,
 				2FF560E41FF0C039001AF272 /* Application.swift in Sources */,
 				2FF560E71FF0C039001AF272 /* Constants.swift in Sources */,
 			);
@@ -447,6 +451,7 @@
 				INFOPLIST_FILE = "$(SRCROOT)/Sources/Info.plist";
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @loader_path/Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 12.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tylermandry.AXSwift;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -469,6 +474,7 @@
 				INFOPLIST_FILE = "$(SRCROOT)/Sources/Info.plist";
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @loader_path/Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 12.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tylermandry.AXSwift;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
