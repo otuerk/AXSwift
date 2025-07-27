@@ -4,8 +4,14 @@ import AXSwift
 class ApplicationDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         // Check that we have permission
-        UIElement.isProcessTrusted(withPrompt: true) { trusted in
-            guard trusted else {
+        UIElement.isProcessTrusted(withPrompt: true) { trusted, error in
+            if let error = error {
+                NSLog("Error checking trust: \(error)")
+                NSRunningApplication.current.terminate()
+                return
+            }
+            
+            guard let trusted = trusted, trusted else {
                 NSLog("No accessibility API permission, exiting")
                 NSRunningApplication.current.terminate()
                 return
@@ -22,30 +28,27 @@ class ApplicationDelegate: NSObject, NSApplicationDelegate {
             NSLog("localizedName: \(String(describing: application.localizedName)), processIdentifier: \(application.processIdentifier))")
             let uiApp = Application(application)!
             
-            uiApp.windows { result in
-                switch result {
-                case .success(let windows):
-                    NSLog("windows: \(String(describing: windows))")
-                case .failure(let error):
+            uiApp.windows { windows, error in
+                if let error = error {
                     NSLog("error getting windows: \(error)")
+                } else {
+                    NSLog("windows: \(String(describing: windows))")
                 }
             }
             
-            uiApp.attributes { result in
-                switch result {
-                case .success(let attributes):
-                    NSLog("attributes: \(attributes)")
-                case .failure(let error):
+            uiApp.attributes { attributes, error in
+                if let error = error {
                     NSLog("error getting attributes: \(error)")
+                } else {
+                    NSLog("attributes: \(attributes ?? [])")
                 }
             }
             
-            uiApp.elementAtPosition(0, 0) { result in
-                switch result {
-                case .success(let element):
-                    NSLog("at 0,0: \(String(describing: element))")
-                case .failure(let error):
+            uiApp.elementAtPosition(0, 0) { element, error in
+                if let error = error {
                     NSLog("error getting element at position: \(error)")
+                } else {
+                    NSLog("at 0,0: \(String(describing: element))")
                 }
             }
         }
@@ -54,32 +57,27 @@ class ApplicationDelegate: NSObject, NSApplicationDelegate {
         if let app = Application.allForBundleID("com.apple.finder").first {
             NSLog("finder: \(app)")
             
-            app.attribute(.role) { (result: Result<Role?, Error>) in
-                switch result {
-                case .success(let role):
-                    NSLog("role: \(role!)")
-                case .failure(let error):
+            app.role { role, error in
+                if let error = error {
                     NSLog("error getting role: \(error)")
+                } else if let role = role {
+                    NSLog("role: \(role)")
                 }
             }
             
-            app.windows { result in
-                switch result {
-                case .success(let windows):
-                    NSLog("windows: \(windows!)")
-                case .failure(let error):
+            app.windows { windows, error in
+                if let error = error {
                     NSLog("error getting windows: \(error)")
+                } else if let windows = windows {
+                    NSLog("windows: \(windows)")
                 }
             }
             
-            app.attribute(.title) { (result: Result<String?, Error>) in
-                switch result {
-                case .success(let title):
-                    if let title = title {
-                        NSLog("title: \(title)")
-                    }
-                case .failure(let error):
+            app.attribute(.title) { (title: String?, error: Error?) in
+                if let error = error {
                     NSLog("error getting title: \(error)")
+                } else if let title = title {
+                    NSLog("title: \(title)")
                 }
             }
         }
@@ -88,21 +86,19 @@ class ApplicationDelegate: NSObject, NSApplicationDelegate {
         // This would need to be moved inside the windows callback above
 
         NSLog("system wide:")
-        systemWideElement.attribute(.role) { (result: Result<Role?, Error>) in
-            switch result {
-            case .success(let role):
-                NSLog("role: \(role!)")
-            case .failure(let error):
+        systemWideElement.role { role, error in
+            if let error = error {
                 NSLog("error getting system role: \(error)")
+            } else if let role = role {
+                NSLog("role: \(role)")
             }
         }
         
-        systemWideElement.attributes { result in
-            switch result {
-            case .success(let attributes):
-                NSLog("attributes: \(attributes)")
-            case .failure(let error):
+        systemWideElement.attributes { attributes, error in
+            if let error = error {
                 NSLog("error getting system attributes: \(error)")
+            } else {
+                NSLog("attributes: \(attributes ?? [])")
             }
         }
         

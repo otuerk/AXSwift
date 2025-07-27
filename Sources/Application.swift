@@ -51,23 +51,23 @@ public final class Application: UIElement {
     }
 
     /// Returns a list of the application's visible windows asynchronously.
-    /// - parameter completion: Called with an array of `UIElement`s, one for every visible window. 
-    ///                        Or `nil` if the list cannot be retrieved.
-    public func windows(completion: @escaping (Result<[UIElement]?, Error>) -> Void) {
-        attribute("AXWindows") { (result: Result<[AXUIElement]?, Error>) in
-            switch result {
-            case .success(let axWindows):
-                let windows = axWindows?.map({ UIElement($0) })
-                completion(.success(windows))
-            case .failure(let error):
-                completion(.failure(error))
+    /// - parameter completion: Called with (windows, error) on the main queue. Windows is an array of `UIElement`s, 
+    ///                        one for every visible window, or `nil` if the list cannot be retrieved.
+    public func windows(completion: @escaping ([UIElement]?, Error?) -> Void) {
+        attribute("AXWindows") { (axWindows: [AXUIElement]?, error: Error?) in
+            if let error = error {
+                completion(nil, error)
+                return
             }
+            
+            let windows = axWindows?.map({ UIElement($0) })
+            completion(windows, nil)
         }
     }
 
     /// Returns the element at the specified top-down coordinates asynchronously, or nil if there is none.
-    /// - parameter completion: Called with the result on the main queue 
-    public override func elementAtPosition(_ x: Float, _ y: Float, completion: @escaping (Result<UIElement?, Error>) -> Void) {
+    /// - parameter completion: Called with (element, error) on the main queue 
+    public override func elementAtPosition(_ x: Float, _ y: Float, completion: @escaping (UIElement?, Error?) -> Void) {
         super.elementAtPosition(x, y, completion: completion)
     }
 }

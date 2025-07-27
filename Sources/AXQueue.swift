@@ -13,17 +13,17 @@ class AXQueue {
     
     /// Execute AX operation asynchronously on background queue
     /// All AX operations must go through this to ensure thread safety
-    func execute<T>(_ operation: @escaping () throws -> T, 
-                   completion: @escaping (Result<T, Error>) -> Void) {
+    func execute<T>(_ operation: @escaping () throws -> T?, 
+                   completion: @escaping (T?, Error?) -> Void) {
         axQueue.async {
             do {
                 let value = try operation()
                 DispatchQueue.main.async {
-                    completion(.success(value))
+                    completion(value, nil)
                 }
             } catch {
                 DispatchQueue.main.async {
-                    completion(.failure(error))
+                    completion(nil, error)
                 }
             }
         }
@@ -32,16 +32,16 @@ class AXQueue {
     /// Execute AX operation asynchronously with custom callback queue
     func execute<T>(_ operation: @escaping () throws -> T,
                    callbackQueue: DispatchQueue,
-                   completion: @escaping (Result<T, Error>) -> Void) {
+                   completion: @escaping (T?, Error?) -> Void) {
         axQueue.async {
             do {
                 let value = try operation()
                 callbackQueue.async {
-                    completion(.success(value))
+                    completion(value, nil)
                 }
             } catch {
                 callbackQueue.async {
-                    completion(.failure(error))
+                    completion(nil, error)
                 }
             }
         }
@@ -49,7 +49,7 @@ class AXQueue {
     
     /// Execute multiple AX operations in sequence on the background queue
     func executeBatch<T>(_ operations: [() throws -> T],
-                        completion: @escaping (Result<[T], Error>) -> Void) {
+                        completion: @escaping ([T]?, Error?) -> Void) {
         axQueue.async {
             do {
                 var results: [T] = []
@@ -58,11 +58,11 @@ class AXQueue {
                     results.append(result)
                 }
                 DispatchQueue.main.async {
-                    completion(.success(results))
+                    completion(results, nil)
                 }
             } catch {
                 DispatchQueue.main.async {
-                    completion(.failure(error))
+                    completion(nil, error)
                 }
             }
         }

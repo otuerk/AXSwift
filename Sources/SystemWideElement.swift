@@ -12,8 +12,8 @@ open class SystemWideElement: UIElement {
     }
 
     /// Returns the element at the specified top-down coordinates asynchronously, or nil if there is none.
-    /// - parameter completion: Called with the result on the main queue
-    open override func elementAtPosition(_ x: Float, _ y: Float, completion: @escaping (Result<UIElement?, Error>) -> Void) {
+    /// - parameter completion: Called with (element, error) on the main queue
+    open override func elementAtPosition(_ x: Float, _ y: Float, completion: @escaping (UIElement?, Error?) -> Void) {
         super.elementAtPosition(x, y, completion: completion)
     }
 }
