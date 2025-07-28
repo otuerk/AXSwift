@@ -235,60 +235,70 @@ open class UIElement {
         }, completion: completion)
     }
 
-    /// Gets multiple attributes of the element at once.
+    /// Gets multiple attributes of the element at once asynchronously.
     ///
     /// - parameter attributes: An array of attribute names. Nonexistent attributes are ignored.
-    ///
-    /// - returns: A dictionary mapping provided parameter names to their values. Parameters which
-    ///            don't exist or have no value will be absent.
-    ///
-    /// - throws: If there are any errors other than .NoValue or .AttributeUnsupported, it will
-    ///           throw the first one it encounters.
+    /// - parameter completion: Called with (attributeValues, error) where attributeValues is a dictionary 
+    ///                        mapping provided parameter names to their values. Parameters which
+    ///                        don't exist or have no value will be absent.
     ///
     /// - note: Presumably you would use this API for performance, though it's not explicitly
     ///         documented by Apple that there is actually a difference.
-    open func getMultipleAttributes(_ names: Attribute...) throws -> [Attribute: Any] {
-        return try getMultipleAttributes(names)
-    }
-
-    open func getMultipleAttributes(_ attributes: [Attribute]) throws -> [Attribute: Any] {
-        let values = try fetchMultiAttrValues(attributes.map({ $0.rawValue }))
-        return try packMultiAttrValues(attributes, values: values)
-    }
-
-    open func getMultipleAttributes(_ attributes: [String]) throws -> [String: Any] {
-        let values = try fetchMultiAttrValues(attributes)
-        return try packMultiAttrValues(attributes, values: values)
-    }
-
-    // Helper: Gets list of values
-    fileprivate func fetchMultiAttrValues(_ attributes: [String]) throws -> [AnyObject] {
-        var valuesCF: CFArray?
-        let error = AXUIElementCopyMultipleAttributeValues(
-            element,
-            attributes as CFArray,
-            // keep going on errors (particularly NoValue)
-            AXCopyMultipleAttributeOptions(rawValue: 0),
-            &valuesCF)
-
-        guard error == .success else {
-            throw error
-        }
-
-        return valuesCF! as [AnyObject]
-    }
-
-    // Helper: Packs names, values into dictionary
-    fileprivate func packMultiAttrValues<Attr>(_ attributes: [Attr],
-                                               values: [AnyObject]) throws -> [Attr: Any] {
-        var result = [Attr: Any]()
-        for (index, attribute) in attributes.enumerated() {
-            if try checkMultiAttrValue(values[index]) {
-                result[attribute] = unpackAXValue(values[index])
+    open func getMultipleAttributes(_ attributes: [Attribute], completion: @escaping ([Attribute: Any]?, Error?) -> Void) {
+        getMultipleAttributes(attributes.map { $0.rawValue }) { stringResult, error in
+            if let error = error {
+                completion(nil, error)
+                return
             }
+            
+            guard let stringResult = stringResult else {
+                completion(nil, nil)
+                return
+            }
+            
+            // Convert string keys back to Attribute enum
+            var attributeResult: [Attribute: Any] = [:]
+            for (key, value) in stringResult {
+                if let attribute = Attribute(rawValue: key) {
+                    attributeResult[attribute] = value
+                }
+            }
+            completion(attributeResult, nil)
         }
-        return result
     }
+
+    open func getMultipleAttributes(_ attributes: [String], completion: @escaping ([String: Any]?, Error?) -> Void) {
+        AXQueue.shared.execute({
+            var valuesCF: CFArray?
+            let error = AXUIElementCopyMultipleAttributeValues(
+                self.element,
+                attributes as CFArray,
+                AXCopyMultipleAttributeOptions(rawValue: 0),
+                &valuesCF
+            )
+            
+            guard error == .success else {
+                throw error
+            }
+            
+            let values = valuesCF! as [AnyObject]
+            var result: [String: Any] = [:]
+            
+            for (index, attribute) in attributes.enumerated() {
+                if try self.checkMultiAttrValue(values[index]) {
+                    result[attribute] = self.unpackAXValue(values[index])
+                }
+            }
+            
+            return result
+        }, completion: completion)
+    }
+    
+    /// Convenience method for getting multiple attributes with variadic parameters
+    open func getMultipleAttributes(_ attributes: Attribute..., completion: @escaping ([Attribute: Any]?, Error?) -> Void) {
+        getMultipleAttributes(attributes, completion: completion)
+    }
+
 
     // Helper: Checks if value is present and not an error (throws on nontrivial errors).
     fileprivate func checkMultiAttrValue(_ value: AnyObject) throws -> Bool {
