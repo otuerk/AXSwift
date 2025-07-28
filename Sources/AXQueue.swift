@@ -2,6 +2,7 @@ import Foundation
 import Cocoa
 
 /// Thread-safe queue manager for all AX API operations
+@available(macOS 10.15, *)
 class AXQueue {
     static let shared = AXQueue()
     
@@ -11,58 +12,56 @@ class AXQueue {
         axQueue = DispatchQueue(label: "at.otu.axswift.axqueue", qos: .userInitiated)
     }
     
-    /// Execute AX operation asynchronously on background queue
+    /// Execute AX operation asynchronously on background queue using async/await
     /// All AX operations must go through this to ensure thread safety
-    func execute<T>(_ operation: @escaping () throws -> T?, 
-                   completion: @escaping (T?, Error?) -> Void) {
-        axQueue.async {
-            do {
-                let value = try operation()
-                DispatchQueue.main.async {
-                    completion(value, nil)
-                }
-            } catch {
-                DispatchQueue.main.async {
-                    completion(nil, error)
+    @available(macOS 10.15, *)
+    func execute<T>(_ operation: @escaping () throws -> T?) async throws -> T? {
+        return try await withCheckedThrowingContinuation { continuation in
+            axQueue.async {
+                do {
+                    let value = try operation()
+                    continuation.resume(returning: value)
+                } catch {
+                    continuation.resume(throwing: error)
                 }
             }
         }
     }
     
-    /// Execute AX operation asynchronously with custom callback queue
+    /// Execute AX operation asynchronously with custom callback queue using async/await
+    @available(macOS 10.15, *)
     func execute<T>(_ operation: @escaping () throws -> T,
-                   callbackQueue: DispatchQueue,
-                   completion: @escaping (T?, Error?) -> Void) {
-        axQueue.async {
-            do {
-                let value = try operation()
-                callbackQueue.async {
-                    completion(value, nil)
-                }
-            } catch {
-                callbackQueue.async {
-                    completion(nil, error)
+                   callbackQueue: DispatchQueue) async throws -> T {
+        return try await withCheckedThrowingContinuation { continuation in
+            axQueue.async {
+                do {
+                    let value = try operation()
+                    callbackQueue.async {
+                        continuation.resume(returning: value)
+                    }
+                } catch {
+                    callbackQueue.async {
+                        continuation.resume(throwing: error)
+                    }
                 }
             }
         }
     }
     
-    /// Execute multiple AX operations in sequence on the background queue
-    func executeBatch<T>(_ operations: [() throws -> T],
-                        completion: @escaping ([T]?, Error?) -> Void) {
-        axQueue.async {
-            do {
-                var results: [T] = []
-                for operation in operations {
-                    let result = try operation()
-                    results.append(result)
-                }
-                DispatchQueue.main.async {
-                    completion(results, nil)
-                }
-            } catch {
-                DispatchQueue.main.async {
-                    completion(nil, error)
+    /// Execute multiple AX operations in sequence on the background queue using async/await
+    @available(macOS 10.15, *)
+    func executeBatch<T>(_ operations: [() throws -> T]) async throws -> [T] {
+        return try await withCheckedThrowingContinuation { continuation in
+            axQueue.async {
+                do {
+                    var results: [T] = []
+                    for operation in operations {
+                        let result = try operation()
+                        results.append(result)
+                    }
+                    continuation.resume(returning: results)
+                } catch {
+                    continuation.resume(throwing: error)
                 }
             }
         }

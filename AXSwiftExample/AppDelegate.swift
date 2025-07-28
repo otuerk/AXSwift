@@ -1,55 +1,52 @@
 import Cocoa
 import AXSwift
 
+@available(macOS 10.15, *)
 class ApplicationDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ aNotification: Notification) {
-        // Check that we have permission
-        UIElement.isProcessTrusted(withPrompt: true) { trusted, error in
-            if let error = error {
-                NSLog("Error checking trust: \(error)")
-                NSRunningApplication.current.terminate()
-                return
-            }
+        Task {
+            await self.runApplication()
+        }
+    }
+    
+    @available(macOS 10.15, *)
+    private func runApplication() async {
+        do {
+            // Check that we have permission
+            let trusted = try await UIElement.isProcessTrusted(withPrompt: true)
             
-            guard let trusted = trusted, trusted else {
+            guard trusted else {
                 NSLog("No accessibility API permission, exiting")
                 NSRunningApplication.current.terminate()
                 return
             }
             
-            self.runAXTests()
+            await self.runAXTests()
+        } catch {
+            NSLog("Error checking trust: \(error)")
+            NSRunningApplication.current.terminate()
         }
     }
     
-    private func runAXTests() {
+    @available(macOS 10.15, *)
+    private func runAXTests() async {
 
         // Get Active Application
         if let application = NSWorkspace.shared.frontmostApplication {
             NSLog("localizedName: \(String(describing: application.localizedName)), processIdentifier: \(application.processIdentifier))")
             let uiApp = Application(application)!
             
-            uiApp.windows { windows, error in
-                if let error = error {
-                    NSLog("error getting windows: \(error)")
-                } else {
-                    NSLog("windows: \(String(describing: windows))")
-                }
-            }
-            
-            uiApp.attributes { attributes, error in
-                if let error = error {
-                    NSLog("error getting attributes: \(error)")
-                } else {
-                    NSLog("attributes: \(attributes ?? [])")
-                }
-            }
-            
-            uiApp.elementAtPosition(0, 0) { element, error in
-                if let error = error {
-                    NSLog("error getting element at position: \(error)")
-                } else {
-                    NSLog("at 0,0: \(String(describing: element))")
-                }
+            do {
+                let windows = try await uiApp.windows()
+                NSLog("windows: \(String(describing: windows))")
+                
+                let attributes = try await uiApp.attributes()
+                NSLog("attributes: \(attributes)")
+                
+                let element = try await uiApp.elementAtPosition(0, 0)
+                NSLog("at 0,0: \(String(describing: element))")
+            } catch {
+                NSLog("error getting app info: \(error)")
             }
         }
 
@@ -57,28 +54,19 @@ class ApplicationDelegate: NSObject, NSApplicationDelegate {
         if let app = Application.allForBundleID("com.apple.finder").first {
             NSLog("finder: \(app)")
             
-            app.role { role, error in
-                if let error = error {
-                    NSLog("error getting role: \(error)")
-                } else if let role = role {
-                    NSLog("role: \(role)")
-                }
-            }
-            
-            app.windows { windows, error in
-                if let error = error {
-                    NSLog("error getting windows: \(error)")
-                } else if let windows = windows {
-                    NSLog("windows: \(windows)")
-                }
-            }
-            
-            app.attribute(.title) { (title: String?, error: Error?) in
-                if let error = error {
-                    NSLog("error getting title: \(error)")
-                } else if let title = title {
+            do {
+                let role = try await app.role()
+                NSLog("role: \(role ?? Role.unknown)")
+                
+                let windows = try await app.windows()
+                NSLog("windows: \(windows ?? [])")
+                
+                let title: String? = try await app.attribute(.title)
+                if let title = title {
                     NSLog("title: \(title)")
                 }
+            } catch {
+                NSLog("error getting finder info: \(error)")
             }
         }
 
@@ -86,25 +74,18 @@ class ApplicationDelegate: NSObject, NSApplicationDelegate {
         // This would need to be moved inside the windows callback above
 
         NSLog("system wide:")
-        systemWideElement.role { role, error in
-            if let error = error {
-                NSLog("error getting system role: \(error)")
-            } else if let role = role {
-                NSLog("role: \(role)")
-            }
+        do {
+            let role = try await systemWideElement.role()
+            NSLog("system role: \(role ?? Role.unknown)")
+            
+            let attributes = try await systemWideElement.attributes()
+            NSLog("system attributes: \(attributes)")
+        } catch {
+            NSLog("error getting system info: \(error)")
         }
         
-        systemWideElement.attributes { attributes, error in
-            if let error = error {
-                NSLog("error getting system attributes: \(error)")
-            } else {
-                NSLog("attributes: \(attributes ?? [])")
-            }
-        }
-        
-        // Terminate after a delay to allow async operations to complete
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            NSRunningApplication.current.terminate()
-        }
+        // Terminate after a short delay
+        try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+        NSRunningApplication.current.terminate()
     }
 }

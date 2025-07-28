@@ -51,23 +51,17 @@ public final class Application: UIElement {
     }
 
     /// Returns a list of the application's visible windows asynchronously.
-    /// - parameter completion: Called with (windows, error) on the main queue. Windows is an array of `UIElement`s, 
-    ///                        one for every visible window, or `nil` if the list cannot be retrieved.
-    public func windows(completion: @escaping ([UIElement]?, Error?) -> Void) {
-        attribute("AXWindows") { (axWindows: [AXUIElement]?, error: Error?) in
-            if let error = error {
-                completion(nil, error)
-                return
-            }
-            
-            let windows = axWindows?.map({ UIElement($0) })
-            completion(windows, nil)
-        }
+    /// - returns: An array of `UIElement`s, one for every visible window, or `nil` if the list cannot be retrieved.
+    @available(macOS 10.15, *)
+    public func windows() async throws -> [UIElement]? {
+        let axWindows: [AXUIElement]? = try await attribute("AXWindows")
+        return axWindows?.map({ UIElement($0) })
     }
 
     /// Returns the element at the specified top-down coordinates asynchronously, or nil if there is none.
-    /// - parameter completion: Called with (element, error) on the main queue 
-    public override func elementAtPosition(_ x: Float, _ y: Float, completion: @escaping (UIElement?, Error?) -> Void) {
-        super.elementAtPosition(x, y, completion: completion)
+    /// - returns: The UI element at the specified position, if any
+    @available(macOS 10.15, *)
+    public override func elementAtPosition(_ x: Float, _ y: Float) async throws -> UIElement? {
+        return try await super.elementAtPosition(x, y)
     }
 }
